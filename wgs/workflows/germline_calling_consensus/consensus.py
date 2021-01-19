@@ -48,7 +48,10 @@ def get_counts(record, caller, sample_id):
         alt = sample['AC']
     elif caller == 'freebayes':
         depth = sample['DP']
-        ref = sample['RO']
+        try:
+            ref = sample['RO']
+        except Exception:
+            print(sample, record, "\n\nHERE")
         alt = sample['AO']
     elif caller == 'rtg':
         depth = sample['DP']
@@ -126,8 +129,11 @@ def fetch_vcf(filename, chromosome, caller):
             assert len(filter) <= 1
             filter = filter[0]
 
-        ref_count, alt_counts, depth = get_counts(record, caller, sample_id)
+        # ref_count, alt_counts, depth = get_counts(record, caller, sample_id)
 
+        if alts == [None]:
+            continue
+        ref_count, alt_counts, depth = get_counts(record, caller, sample_id)
         for alt, alt_count in zip(alts, alt_counts):
             alt = str(alt)
             data = [record.QUAL, filter, ref_count, alt_count, depth, '{}_{}'.format(caller, id_counter)]

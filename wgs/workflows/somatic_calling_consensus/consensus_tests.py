@@ -6,26 +6,26 @@ import consensus
 import pypeliner
 from shutil import copyfile
 import csv
-import pandas as pd
 from collections import namedtuple
 
 def get_testdata(testdir):
 
-    freebayes = os.path.join(testdir, "freebayes_germline.vcf.gz")
-    samtools = os.path.join(testdir, "samtools_germline.vcf.gz")
-    museq = os.path.join(testdir, "museq_single_annotated_germline.vcf.gz")
-    rtg = os.path.join(testdir, "rtg_germline.vcf.gz")
+    museq = os.path.join(testdir, "museq_paired_germline.vcf.gz")
+    mutect = os.path.join(testdir,  "mutect_germline.vcf.gz")
+    strelka_indel = os.path.join(testdir, "strelka_indel_germline.vcf.gz")
+    strelka_snv = os.path.join(testdir, "strelka_snv_germline.vcf.gz")
 
-    pypeliner.commandline.execute("wget", "-O", freebayes, "https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/germline/freebayes_germline.vcf.gz")
-    pypeliner.commandline.execute("wget",  "-O", freebayes+".tbi","https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/germline/freebayes_germline.vcf.gz.tbi")
-    pypeliner.commandline.execute("wget",  "-O", samtools,"https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/germline/museq_single_annotated_germline.vcf.gz")
-    pypeliner.commandline.execute("wget",  "-O", samtools+".tbi","https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/germline/museq_single_annotated_germline.vcf.gz.tbi")
-    pypeliner.commandline.execute("wget",  "-O", rtg,"https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/germline/rtg_germline.vcf.gz")
-    pypeliner.commandline.execute("wget",  "-O", rtg+".tbi","https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/germline/rtg_germline.vcf.gz.tbi")
-    pypeliner.commandline.execute("wget",  "-O", samtools,"https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/germline/samtools_germline.vcf.gz")
-    pypeliner.commandline.execute("wget",  "-O", samtools+".tbi","https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/germline/samtools_germline.vcf.gz.tbi")
 
-    return {"freebayes": freebayes, "samtools": samtools, "museq": museq, "rtg": rtg}, "SA1181_N"
+    pypeliner.commandline.execute("wgt", "-O", museq, "https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/somatic/museq_paired_germline.vcf.gz")
+    pypeliner.commandline.execute("wgt",  "-O", museq+".tbi","https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/somatic/museq_paired_germline.vcf.gz.tbi")
+    pypeliner.commandline.execute("wgt",  "-O", mutect,"https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/somatic/mutect_germline.vcf.gz")
+    pypeliner.commandline.execute("wgt",  "-O", mutect+".tbi","https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/somatic/mutect_germline.vcf.gz.tbi")
+    pypeliner.commandline.execute("wgt",  "-O", strelka_indel,"https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/somatic/strelka_indel_germline.vcf.gz")
+    pypeliner.commandline.execute("wgt",  "-O", strelka_indel+".tbi","https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/somatic/strelka_indel_germline.vcf.gz.tbi")
+    pypeliner.commandline.execute("wgt",  "-O", strelka_snv,"https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/somatic/strelka_snv_germline.vcf.gz")
+    pypeliner.commandline.execute("wgt",  "-O", strelka_snv+".tbbi","https://wgs-test-sets.s3.amazonaws.com/consensus_test_vcfs/somatic/strelka_snv_germline.vcf.gz.tbi")
+
+    return {"museq": museq, "mutect": mutect, "strelka_indel": strelka_indel, "strelka_snv": strelka_snv}, "SA609N", "SA609T"
 
 
 def get_random_record(reader):
@@ -33,17 +33,17 @@ def get_random_record(reader):
     lines1 = reader.fetch(chrom)
     return random.choice([next(lines1) for _ in range(10000)])
 
-    
 def get_test_line(v1, v2, n=10000):
     #choose a random chrom
     not_matched = False
     reader1 = vcf.Reader(filename=v1)
     reader2 = vcf.Reader(filename=v2)
-    get_random_record(reader1)
+    line = get_random_record(reader1)
     while not_matched == False:
         try:
             next(reader2.fetch(line.CHROM, start=line.POS-1, end=line.POS))
-            get_random_record(reader1)
+            line = get_random_record(reader1)
+
         except StopIteration:
             not_matched=True
             return line
@@ -105,6 +105,7 @@ def add_entry_to_vcf(record, v, tmpdir):
     pypeliner.commandline.execute("tabix", "-f", "-p", "vcf", v)
 
 
+
 def run_consensus_test(vcfs, test1, test2, tmpdir):
 
     testfile1 = os.path.join(tmpdir, os.path.basename(vcfs[test1]))
@@ -135,9 +136,9 @@ def run_consensus_test(vcfs, test1, test2, tmpdir):
     counts = os.path.join(tmpdir, "counts.tsv")
 
     consensus.main(vcfs["museq"], 
-        vcfs["freebayes"], 
-        vcfs["rtg"], 
-        vcfs["samtools"], 
+        vcfs["strelka"], 
+        vcfs["mutect"], 
+        vcfs["strelka_indel"], 
         consensus_vcf, 
         counts, 
         chroms    
@@ -184,9 +185,9 @@ def run_normalize_test(vcfs, test1, test2, a1, r1, a2, r2, tmpdir):
     counts = os.path.join(tmpdir, "counts.tsv")
 
     consensus.main(vcfs["museq"], 
-        vcfs["freebayes"], 
-        vcfs["rtg"], 
-        vcfs["samtools"], 
+        vcfs["strelka"], 
+        vcfs["mutect"], 
+        vcfs["strelka_indel"], 
         consensus_vcf, 
         counts, 
         chroms    
@@ -198,79 +199,78 @@ def run_normalize_test(vcfs, test1, test2, a1, r1, a2, r2, tmpdir):
     
 
 
-def test_museq_freebayes(testdir):
+def test_museq_strelka(testdir):
+    vcfs, _, _  =  get_testdata(testdir)
+    run_consensus_test(vcfs, "museq", "strelka", testdir)
 
-    vcfs, _ = get_testdata(testdir)
-    run_consensus_test(vcfs, "museq", "freebayes", testdir)
+def test_museq_strelka_indel(testdir):
+    vcfs, _, _ =  get_testdata(testdir)
+    run_consensus_test(vcfs, "museq", "strelka_indel", testdir)
 
-def test_museq_rtg(testdir):
-    vcfs, _ = get_testdata(testdir)
-    run_consensus_test(vcfs, "rtg", "museq", testdir)
+def test_museq_mutect(testdir):
+    vcfs, _, _  =  get_testdata(testdir)
+    run_consensus_test(vcfs, "museq", "mutect", testdir)
 
-def test_museq_samtools(testdir):
-    vcfs, _ = get_testdata(testdir)
-    run_consensus_test(vcfs, "samtools", "museq", testdir)
+def test_strelka_mutect(testdir):
+    vcfs, _, _  =  get_testdata(testdir)
+    run_consensus_test(vcfs, "strelka", "mutect", testdir)
 
-def test_samtools_rtg(testdir):
-    vcfs, _ = get_testdata(testdir)
-    run_consensus_test(vcfs, "samtools", "rtg", testdir)
+def test_strelka_strelka_indel(testdir):
+    vcfs, _, _  =  get_testdata(testdir)
+    run_consensus_test(vcfs, "strelka", "strelka_indel", testdir)
 
-def test_samtools_freebayes(testdir):
-    vcfs, _ = get_testdata(testdir)
-    run_consensus_test(vcfs, "samtools", "freebayes", testdir)
+def test_mutect_strelka_indel(testdir):
+    vcfs, _, _ =  get_testdata(testdir)
+    run_consensus_test(vcfs, "mutect", "strelka_indel", testdir)
 
-def test_rtg_freebayes(ftestdir):
-    vcfs, _ = get_testdata(testdir)
-    run_consensus_test(vcfs, "rtg", "freebayes", testdir)
 
 def test_normalization_1(testdir):
     # A-> AT and AT->ATT
-    vcfs, _ = get_testdata(testdir)
+    vcfs, _, _  =  get_testdata(testdir)
     r1 =  "A"
     a1 = "AT"
     r2 = "AT"
     a2 = "ATT"
-    consensus_variant =  run_normalize_test(vcfs, "rtg", "samtools",  a1, r1, a2, r2, testdir)
+    consensus_variant =  run_normalize_test(vcfs, "strelka", "museq",  a1, r1, a2, r2, testdir)
 
     assert consensus_variant.REF == "A"
     assert consensus_variant.ALT == "AT"
 
-def test_normalization_2(testdir):
-    #  GTA -> G and GTATA -> GTA
-    vcfs, _ = get_testdata(testdir)
+def test_normalization_2( testdir):
+    # A-> AT and AT->ATT
+    vcfs, _, _  =  get_testdata(testdir)
     r1 =  "GTA"
     a1 = "G"
     r2 = "GTATA"
     a2 = "GTA"
-    consensus_variant =  run_normalize_test(vcfs, "rtg", "samtools",  a1, r1, a2, r2, testdir)
+    consensus_variant =  run_normalize_test(vcfs, "strelka", "museq",  a1, r1, a2, r2, testdir)
 
     assert consensus_variant.REF == "GTA"
     assert consensus_variant.ALT == "G"
 
 def test_normalization_3(testdir):
-    #   CA -> CTA  and C -> CT 
-    vcfs, _ = get_testdata(testdir)
+    # A-> AT and AT->ATT
+    vcfs, _, _  =  get_testdata(testdir)
     r1 =  "CA"
     a1 = "CTA"
     r2 = "C"
     a2 = "CT"
-    consensus_variant =  run_normalize_test(vcfs, "rtg", "samtools",  a1, r1, a2, r2, testdir)
+    consensus_variant =  run_normalize_test(vcfs, "strelka", "museq",  a1, r1, a2, r2, testdir)
 
     assert consensus_variant.REF == "C"
     assert consensus_variant.ALT == "CT"
 
-def test_normalization_4(testdir):
-    #  T -> TAC and T -> TACACAC
-    vcfs, _ = get_testdata(testdir)
+def test_normalization_4( testdir):
+    # A-> AT and AT->ATT
+    vcfs, _, _ =  get_testdata(testdir)
     r1 =  "T"
     a1 = "TAC"
     r2 = "T"
     a2 = "TACACAC"
-    consensus_variant =  run_normalize_test(vcfs, "rtg", "samtools",  a1, r1, a2, r2, testdir)
+    consensus_variant =  run_normalize_test(vcfs, "strelka", "museq",  a1, r1, a2, r2, testdir)
 
     assert consensus_variant.REF == "T"
     assert consensus_variant.ALT == "TAC"
-
 
 def test_normalization():
     refs =  ["T", "T"]
@@ -305,32 +305,26 @@ def test_normalization():
 def test_get_counts():
 
     #make example  call
-    Call = namedtuple("Call", "DP RO AO RC AC AD")
-    sample_data = vcf.model._Call(None, "sample_label", Call(1,1,1,1,1, [1,1]) )
+    Call = namedtuple("Call", "DP TAR TIR RC AC AD AU TU")
+    normal_data = vcf.model._Call(None, "normal", Call(1,[1],[1],1,1, [1,1], [1], [1]) )
+    tumor_data = vcf.model._Call(None, "tumor", Call(1,[1],[1],1,1, [1,1], [1], [1] ))
 
-    freebayes_museq_rtg_example = vcf.model._Record("1", 10, 1, "A", [None], 1, 1, None, None, None, [sample_data])
+    test = vcf.model._Record("1", 10, 1, "A", [None], 1, 1, None, None, None, [normal_data, tumor_data])
 
-    samtools_example = vcf.model._Record("1", 10, 1, "A", [None], 1, 1, {"DP":1}, None, None, [sample_data])
+    assert consensus.get_counts(test, "museq_snv", "tumor", "normal", "A", "T") == (1, [1], 1, 1, [1], 1)
+    assert consensus.get_counts(test, "strelka_indel",  "tumor", "normal","A", "T") == (1, [1], 1, 1, [1], 1)
+    assert consensus.get_counts(test, "strelka_snv",  "tumor", "normal","A", "T") == (1, [1], 1, 1, [1], 1)
+    assert consensus.get_counts(test, "mutect",  "tumor", "normal","A", "T") == (1, [1], 1, 1, [1], 1)
 
-    assert consensus.get_counts(freebayes_museq_rtg_example, "freebayes", "sample_label") == (1, [1], 1)
-    assert consensus.get_counts(freebayes_museq_rtg_example, "museq_germline", "sample_label") == (1, [1], 1)
-    assert consensus.get_counts(freebayes_museq_rtg_example, "rtg", "sample_label") == (1, [1], 1)
-    assert consensus.get_counts(samtools_example, "samtools", "sample_label") == ("NA", ["NA"], 1)
+
+
+museq = "/juno/work/shah/isabl_data_lake/analyses/78/36/7836/results/somatic/SA609T/SA609T_museq_paired_annotated.vcf.gz" 
+strelka = "/juno/work/shah/isabl_data_lake/analyses/78/36/7836/results/somatic/SA609T/SA609T_strelka_snv_annotated.vcf.gz"
+strelka_indel = "/juno/work/shah/isabl_data_lake/analyses/78/36/7836/results/somatic/SA609T/SA609T_strelka_indel_annotated.vcf.gz"
+mutect = "/juno/work/shah/isabl_data_lake/analyses/78/36/7836/results/somatic/SA609T/SA609T_mutect.vcf.gz"
+
 
 test_get_counts()
-# freebayes = "/juno/work/shah/isabl_data_lake/analyses/63/79/6379/results/germline/SA1181_N/SA1181_N_freebayes_germline.vcf.gz"
-# museq = "/juno/work/shah/isabl_data_lake/analyses/63/79/6379/results/germline/SA1181_N/SA1181_N_museq_single_annotated.vcf.gz"
-# rtg = "/juno/work/shah/isabl_data_lake/analyses/63/79/6379/results/germline/SA1181_N/SA1181_N_rtg_germline.vcf.gz"
-# samtools = "/juno/work/shah/isabl_data_lake/analyses/63/79/6379/results/germline/SA1181_N/SA1181_N_samtools_germline.vcf.gz"
-
-# test_museq_freebayes(freebayes, museq, rtg, samtools, "/juno/work/shah/abramsd/CODE/TEST")
-
 # make_test("/juno/work/shah/abramsd/CODE/TEST/SA1181_N_freebayes_germline.vcf.gz",
 # "/juno/work/shah/abramsd/CODE/TEST/SA1181_N_museq_single_annotated.vcf.gz")
 
-# print(*["scp", f, d])
-# print(*["gunzip", "-c", nf, "|", "head", "-n", 10000, ">", newname])
-# print(*["vcf-sort", newname, ">", newname + "_sorted"])
-# print(*["mv", newname + "_sorted", newname])
-# print(*["bgzip", newname])
-# print(*["tabix", "-f", "-p", "vcf", newname + ".gz"])
