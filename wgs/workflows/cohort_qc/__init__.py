@@ -6,7 +6,7 @@ import pypeliner.managed as mgd
 from wgs.config import config
 
 
-def cna_annotation_workflow(sample_labels, cohort, remixt_dict, output_table, segmental_copynumber, gtf):
+def cna_annotation_workflow(remixt_dict, output_table, segmental_copynumber, cbio_cna_table, gtf):
     workflow = pypeliner.workflow.Workflow(
         ctx={'docker_image': config.containers('wgs')}
     )
@@ -30,14 +30,40 @@ def cna_annotation_workflow(sample_labels, cohort, remixt_dict, output_table, se
     )
 
     workflow.transform(
-        name='merge_cna_tables',
+        name='merge_amp_tables',
         func='wgs.workflows.cohort_qc.tasks.merge_cna_tables',
         args=(
-            sample_labels,
             mgd.TempInputFile('amps', 'sample_label', axes_origin=[]),
+            mgd.TempOutputFile("merged_amps"),
+        ),
+    )
+
+    workflow.transform(
+        name='merge_del_tables',
+        func='wgs.workflows.cohort_qc.tasks.merge_cna_tables',
+        args=(
             mgd.TempInputFile('dels', 'sample_label', axes_origin=[]),
-            mgd.OutputFile(output_table),
-            cohort
+            mgd.TempOutputFile("merged_dels"),
+        ),
+    )
+
+    workflow.transform(
+        name='make_cbio_cna_table',
+        func='wgs.workflows.cohort_qc.tasks.make_cbio_cna_table',
+        args=(
+            mgd.TempInputFile('merged_amps'),
+            mgd.TempInputFile('merged_dels'),
+            mgd.OutputFile(cbio_cna_table),
+        ),
+    )
+
+    workflow.transform(
+        name='make_maftools_cna_table',
+        func='wgs.workflows.cohort_qc.tasks.make_maftools_cna_table',
+        args=(
+            mgd.TempInputFile('merged_amps'),
+            mgd.TempInputFile('merged_dels'),
+            output_table
         ),
     )
 
@@ -133,6 +159,17 @@ def preprocess_mafs_workflow(cohort, sample_labels, germline_maf_dict, somatic_m
     )
 
     workflow.transform(
+        name='annotate_germline_class',
+        func='wgs.workflows.cohort_qc.tasks.annotate_germline_somatic',
+        axes=("sample_label",),
+        args=(
+            mgd.TempInputFile('filtered_germline_maf', 'sample_label'),
+            mgd.TempOutputFile("filtered_class_labeled_germline_maf", 'sample_label'),
+            True
+        ),
+    )
+
+    workflow.transform(
         name='merge_filtered_germline_somatic',
         func='wgs.workflows.cohort_qc.tasks.merge_mafs',
         args=(
@@ -197,6 +234,14 @@ def create_cohort_qc_report(
     )
 
     workflow.transform(
+        name='build_gene_list',
+        func='wgs.workflows.cohort_qc.tasks.build_gene_list',
+        args=(
+            mgd.InputFile(cna_table),
+            mgd.TempOutputFile("genelist")
+        ),
+    )
+    workflow.transform(
         name='make_cohort_plots',
         func='wgs.workflows.cohort_qc.tasks.make_R_cohort_plots',
         args=(
@@ -205,7 +250,8 @@ def create_cohort_qc_report(
             mgd.OutputFile(oncoplot),
             mgd.OutputFile(somatic_interactions_plot),
             mgd.OutputFile(summary_plot),
-            mgd.TempInputFile("vcNames")
+            mgd.TempInputFile("vcNames"),
+            mgd.TempInputFile("genelist")
 
         ),
         kwargs={'docker_image':config.containers("wgs_qc_html") },
